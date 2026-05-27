@@ -77,11 +77,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "ScamShield — AI-Powered Scam Detection Before You Click" },
       { name: "description", content: "Real-time AI threat analysis for phishing, fake payments, malicious links, and social engineering attacks." },
       { name: "author", content: "ScamShield Labs" },
-      { property: "og:title", content: "ScamShield — AI Scam Intelligence Platform" },
-      { property: "og:description", content: "Detect scams before they detect you. Enterprise-grade scam intelligence powered by explainable AI." },
+      { property: "og:title", content: "ScamShield — AI-Powered Scam Detection Before You Click" },
+      { property: "og:description", content: "Real-time AI threat analysis for phishing, fake payments, malicious links, and social engineering attacks." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@ScamShield" },
+      { name: "twitter:title", content: "ScamShield — AI-Powered Scam Detection Before You Click" },
+      { name: "twitter:description", content: "Real-time AI threat analysis for phishing, fake payments, malicious links, and social engineering attacks." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/d94411e4-4290-443f-a43d-1e669e7567fa" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/d94411e4-4290-443f-a43d-1e669e7567fa" },
     ],
     links: [
       {
