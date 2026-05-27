@@ -415,6 +415,4 @@ function CTA() {
     </Section>
   );
 }
-    </div>
-  );
-}
+
