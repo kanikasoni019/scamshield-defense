@@ -7,7 +7,6 @@ const queryClient = new QueryClient();
 export const router = createRouter({
   routeTree,
   context: { queryClient },
-  scrollRestoration: true,
   defaultPreloadStaleTime: 0,
 });
 
