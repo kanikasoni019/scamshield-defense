@@ -22,6 +22,17 @@ export const Route = createFileRoute("/dashboard")({
 
 type Verdict = "safe" | "suspicious" | "high";
 
+interface AnalysisResult {
+  verdict: Verdict;
+  score: number;
+  trust: number;
+  confidence: number;
+  title: string;
+  explanation: string;
+  signals: { label: string; weight: number }[];
+  action: string;
+}
+
 const SAMPLES = [
   {
     label: "Phishing SMS",
@@ -45,48 +56,125 @@ const SAMPLES = [
   },
 ];
 
-function classify(input: string): {
-  verdict: Verdict; score: number; trust: number; confidence: number;
-  title: string; explanation: string; signals: { label: string; weight: number }[]; action: string;
-} {
+// ── Real Gemini AI Analysis ──────────────────────────────────────────────────
+async function analyzeWithGemini(input: string): Promise<AnalysisResult> {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+
+  const prompt = `You are ScamShield, an expert AI scam detection system for India. Analyze the following message or URL for scam/phishing indicators.
+
+Message to analyze:
+"${input}"
+
+Respond ONLY with a valid JSON object in this exact format (no markdown, no extra text):
+{
+  "verdict": "safe" or "suspicious" or "high",
+  "score": <number 0-99, risk score>,
+  "confidence": <number 60-99>,
+  "title": "<short title like 'High-risk threat detected' or 'No significant threat signals'>",
+  "explanation": "<2-3 sentence explanation of why this is or isn't a scam, specific to Indian context>",
+  "signals": [
+    {"label": "<signal name>", "weight": <number 10-99>}
+  ],
+  "action": "<what the user should do>"
+}
+
+Rules:
+- verdict "high" = score >= 70 (clear scam)
+- verdict "suspicious" = score 35-69 (possible scam)  
+- verdict "safe" = score < 35 (looks legitimate)
+- Include 2-5 signals that explain your reasoning
+- Be specific to Indian scam patterns: UPI fraud, KYC scams, digital arrest, bank impersonation
+- Keep explanation clear and simple for non-technical users`;
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
+      }),
+    }
+  );
+
+  if (!response.ok) throw new Error("Gemini API error");
+
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+
+  // Strip markdown fences if present
+  const clean = text.replace(/```json|```/g, "").trim();
+  const parsed = JSON.parse(clean);
+
+  const verdict: Verdict = parsed.verdict;
+  const score = Math.min(99, Math.max(2, parsed.score));
+  const trust = 100 - score;
+
+  const titles: Record<Verdict, string> = {
+    high: "High-risk threat detected",
+    suspicious: "Suspicious patterns identified",
+    safe: "No significant threat signals",
+  };
+  const actions: Record<Verdict, string> = {
+    high: "Do not interact. Block the sender, report through your organization's verified channel, and share to the community ledger.",
+    suspicious: "Independently verify with the source via a channel you initiated. Do not click links until confirmed.",
+    safe: "Proceed with normal caution. Continue to verify the sender for any sensitive action.",
+  };
+
+  return {
+    verdict,
+    score,
+    trust,
+    confidence: Math.min(99, parsed.confidence ?? 85),
+    title: parsed.title ?? titles[verdict],
+    explanation: parsed.explanation,
+    signals: parsed.signals ?? [{ label: "AI Analysis complete", weight: 50 }],
+    action: parsed.action ?? actions[verdict],
+  };
+}
+
+// ── Fallback rule-based (if API fails) ──────────────────────────────────────
+function classifyFallback(input: string): AnalysisResult {
   const text = input.toLowerCase();
   let score = 5;
   const sig: { label: string; weight: number }[] = [];
 
-  const urgency = /(urgent|immediately|within \d+|suspended|24h|act now|expires)/.test(text);
-  if (urgency) { score += 28; sig.push({ label: "Urgency manipulation", weight: 88 }); }
-
-  const reward = /(congratulations|won|prize|reward|claim|free|gift)/.test(text);
-  if (reward) { score += 22; sig.push({ label: "Reward / lottery baiting", weight: 81 }); }
-
-  const authority = /(bank|hdfc|sbi|paypal|amazon|government|irs|tax|police)/.test(text);
-  if (authority) { score += 14; sig.push({ label: "Authority impersonation cues", weight: 72 }); }
-
-  const credentials = /(kyc|otp|cvv|password|verify|login|wallet)/.test(text);
-  if (credentials) { score += 20; sig.push({ label: "Credential harvesting pattern", weight: 84 }); }
-
-  const lookalike = /(paypa1|hdfc-secure|amaz0n|g00gle|micros0ft|secure-verify|-support|-rewards)/.test(text);
-  if (lookalike) { score += 30; sig.push({ label: "Lookalike / suspicious domain", weight: 96 }); }
-
-  const urlHttp = /http:\/\//.test(text);
-  if (urlHttp) { score += 8; sig.push({ label: "Non-HTTPS link", weight: 58 }); }
+  if (/(urgent|immediately|within \d+|suspended|24h|act now|expires)/.test(text)) {
+    score += 28; sig.push({ label: "Urgency manipulation", weight: 88 });
+  }
+  if (/(congratulations|won|prize|reward|claim|free|gift)/.test(text)) {
+    score += 22; sig.push({ label: "Reward / lottery baiting", weight: 81 });
+  }
+  if (/(bank|hdfc|sbi|paypal|amazon|government|irs|tax|police)/.test(text)) {
+    score += 14; sig.push({ label: "Authority impersonation cues", weight: 72 });
+  }
+  if (/(kyc|otp|cvv|password|verify|login|wallet|upi)/.test(text)) {
+    score += 20; sig.push({ label: "Credential harvesting pattern", weight: 84 });
+  }
+  if (/(paypa1|hdfc-secure|amaz0n|g00gle|micros0ft|secure-verify|-support|-rewards)/.test(text)) {
+    score += 30; sig.push({ label: "Lookalike / suspicious domain", weight: 96 });
+  }
+  if (/http:\/\//.test(text)) {
+    score += 8; sig.push({ label: "Non-HTTPS link", weight: 58 });
+  }
 
   score = Math.min(99, Math.max(2, score));
   const verdict: Verdict = score >= 70 ? "high" : score >= 35 ? "suspicious" : "safe";
   const trust = 100 - score;
   const confidence = Math.min(99, 75 + Math.round(sig.length * 4));
 
-  const titles = {
+  const titles: Record<Verdict, string> = {
     high: "High-risk threat detected",
     suspicious: "Suspicious patterns identified",
     safe: "No significant threat signals",
   };
-  const explanations = {
+  const explanations: Record<Verdict, string> = {
     high: "Multiple high-confidence indicators of fraud were detected. The content combines urgency, authority impersonation and credential harvesting — a hallmark pattern of phishing operations.",
     suspicious: "Some patterns associated with scam content are present. The message warrants caution; verify through an independent, trusted channel before acting.",
     safe: "The content does not match known scam patterns. Trust signals align with legitimate communication, though we recommend continued caution with any link or attachment.",
   };
-  const actions = {
+  const actions: Record<Verdict, string> = {
     high: "Do not interact. Block the sender, report through your organization's verified channel, and share to the community ledger.",
     suspicious: "Independently verify with the source via a channel you initiated. Do not click links until confirmed.",
     safe: "Proceed with normal caution. Continue to verify the sender for any sensitive action.",
@@ -103,28 +191,42 @@ function classify(input: string): {
   };
 }
 
+// ── Page Component ───────────────────────────────────────────────────────────
 function DashboardPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<ReturnType<typeof classify> | null>(null);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [aiPowered, setAiPowered] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const analyze = () => {
+  const analyze = async () => {
     if (!input.trim()) return;
     setLoading(true);
     setResult(null);
-    setTimeout(() => {
-      setResult(classify(input));
+    setError(null);
+    setAiPowered(false);
+
+    try {
+      const res = await analyzeWithGemini(input);
+      setResult(res);
+      setAiPowered(true);
+    } catch (err) {
+      console.error("Gemini failed, using fallback:", err);
+      setResult(classifyFallback(input));
+      setAiPowered(false);
+      setError("AI analysis unavailable — using pattern detection.");
+    } finally {
       setLoading(false);
-    }, 900);
+    }
   };
 
-  const reset = () => { setInput(""); setResult(null); };
+  const reset = () => { setInput(""); setResult(null); setError(null); };
 
   return (
     <div className="relative">
       <Section className="py-12 sm:py-16">
         <div className="flex flex-col gap-4">
-          <Eyebrow>Threat Engine · v2.4</Eyebrow>
+          <Eyebrow>Threat Engine · v2.4 · {aiPowered ? "🤖 Gemini AI" : "Pattern Detection"}</Eyebrow>
           <h1 className="text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
             Paste anything suspicious. Get a verdict in under a second.
           </h1>
@@ -132,6 +234,12 @@ function DashboardPage() {
             Multi-model linguistic, structural and graph analysis — with full reasoning trace.
           </p>
         </div>
+
+        {error && (
+          <div className="mt-4 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
+            ⚠️ {error}
+          </div>
+        )}
 
         <div className="mt-10 grid gap-6 lg:grid-cols-5">
           {/* Input */}
@@ -206,26 +314,28 @@ function DashboardPage() {
                         <Sparkles className="h-6 w-6 text-primary-foreground" />
                       </div>
                     </div>
-                    <p className="mt-4 font-mono text-xs uppercase tracking-widest text-muted-foreground">Running 7 detectors…</p>
+                    <p className="mt-4 font-mono text-xs uppercase tracking-widest text-muted-foreground">
+                      {import.meta.env.VITE_GEMINI_API_KEY ? "Gemini AI analyzing…" : "Running detectors…"}
+                    </p>
                   </div>
                 </motion.div>
               )}
               {result && !loading && (
                 <motion.div key="result" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                  <Verdict result={result} />
+                  <VerdictCard result={result} aiPowered={aiPowered} />
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
         </div>
 
-        {result && <Reasoning result={result} />}
+        {result && <Reasoning result={result} aiPowered={aiPowered} />}
       </Section>
     </div>
   );
 }
 
-function Verdict({ result }: { result: ReturnType<typeof classify> }) {
+function VerdictCard({ result, aiPowered }: { result: AnalysisResult; aiPowered: boolean }) {
   const tone = result.verdict === "high"
     ? { border: "border-danger/40", bg: "bg-danger/10", text: "text-danger", label: "HIGH RISK", icon: AlertTriangle }
     : result.verdict === "suspicious"
@@ -241,6 +351,14 @@ function Verdict({ result }: { result: ReturnType<typeof classify> }) {
         </div>
         <span className={`font-mono text-[11px] ${tone.text}`}>{result.confidence}% confidence</span>
       </div>
+
+      {aiPowered && (
+        <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5">
+          <Sparkles className="h-3 w-3 text-primary" />
+          <span className="font-mono text-[10px] text-primary uppercase tracking-widest">Powered by Gemini AI</span>
+        </div>
+      )}
+
       <h3 className="mt-4 text-xl font-semibold text-foreground">{result.title}</h3>
       <p className="mt-2 text-sm text-muted-foreground">{result.explanation}</p>
 
@@ -269,7 +387,7 @@ function Metric({ label, value, tone }: { label: string; value: string; tone: st
   );
 }
 
-function Reasoning({ result }: { result: ReturnType<typeof classify> }) {
+function Reasoning({ result, aiPowered }: { result: AnalysisResult; aiPowered: boolean }) {
   return (
     <div className="mt-10 grid gap-6 lg:grid-cols-2">
       <div className="rounded-2xl border border-border/60 bg-surface/40 p-6">
@@ -303,7 +421,9 @@ function Reasoning({ result }: { result: ReturnType<typeof classify> }) {
       <div className="rounded-2xl border border-border/60 bg-surface/40 p-6">
         <div className="mb-4 flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-semibold text-foreground">Reasoning trace</h3>
+          <h3 className="text-sm font-semibold text-foreground">
+            Reasoning trace {aiPowered && <span className="ml-2 text-[10px] text-primary font-mono">· GEMINI AI</span>}
+          </h3>
         </div>
         <div className="space-y-2 font-mono text-xs">
           <Trace tag="LANG" tone="primary">Tokenized + classified linguistic markers across 12 axes.</Trace>
@@ -311,7 +431,10 @@ function Reasoning({ result }: { result: ReturnType<typeof classify> }) {
           <Trace tag="URL" tone="warning">URLs cross-referenced against threat intel graph (3.1M nodes).</Trace>
           <Trace tag="GRAPH" tone="primary">Sender / domain age, registrar reputation, hosting clusters analyzed.</Trace>
           <Trace tag="LEDGER" tone="primary">Community ledger checked — verdict cross-validated.</Trace>
-          <Trace tag="MODEL" tone="primary">Ensemble vote across 4 specialized classifiers.</Trace>
+          {aiPowered
+            ? <Trace tag="GEMINI" tone="primary">Google Gemini AI — India-specific scam pattern analysis complete.</Trace>
+            : <Trace tag="MODEL" tone="primary">Ensemble vote across 4 specialized classifiers.</Trace>
+          }
         </div>
       </div>
     </div>
@@ -319,7 +442,11 @@ function Reasoning({ result }: { result: ReturnType<typeof classify> }) {
 }
 
 function Trace({ tag, tone, children }: { tag: string; tone: "primary" | "warning" | "danger"; children: React.ReactNode }) {
-  const tones = { primary: "text-primary border-primary/30 bg-primary/10", warning: "text-warning border-warning/30 bg-warning/10", danger: "text-danger border-danger/30 bg-danger/10" } as const;
+  const tones = {
+    primary: "text-primary border-primary/30 bg-primary/10",
+    warning: "text-warning border-warning/30 bg-warning/10",
+    danger: "text-danger border-danger/30 bg-danger/10"
+  } as const;
   return (
     <div className="flex items-start gap-3">
       <span className={`mt-0.5 rounded border px-1.5 py-0.5 text-[10px] ${tones[tone]}`}>{tag}</span>
