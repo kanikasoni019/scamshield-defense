@@ -58,7 +58,7 @@ const SAMPLES = [
 
 // ── Real Gemini AI Analysis ──────────────────────────────────────────────────
 async function analyzeWithGemini(input: string): Promise<AnalysisResult> {
-  const apiKey =  "AQ.Ab8RN6Id17uwyRKDFFqvy2B48fawBweTvRduubG99dA3WyKKuw";
+  const apiKey =  "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";
   const prompt = `You are ScamShield, an expert AI scam detection system for India. Analyze the following message or URL for scam/phishing indicators.
 
 Message to analyze:
@@ -85,22 +85,27 @@ Rules:
 - Be specific to Indian scam patterns: UPI fraud, KYC scams, digital arrest, bank impersonation
 - Keep explanation clear and simple for non-technical users`;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+ const response = await fetch(
+    "https://api.groq.com/openai/v1/chat/completions",
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
+        model: "llama3-8b-8192",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.1,
+        max_tokens: 1024,
       }),
     }
   );
 
-  if (!response.ok) throw new Error("Gemini API error");
+  if (!response.ok) throw new Error("Groq API error");
 
   const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  const text = data.choices?.[0]?.message?.content ?? "";
 
   // Strip markdown fences if present
   const clean = text.replace(/```json|```/g, "").trim();
