@@ -78,8 +78,15 @@ Interactive dashboards provide insights into:
 * TypeScript
 * Tailwind CSS
 * Framer Motion
+* TanStack Router
 
-### UI Libraries
+### AI & Backend
+
+* Groq API (Llama 3.1 8B)
+* Supabase
+* PostgreSQL
+
+### UI & Visualization
 
 * Radix UI
 * Lucide React
@@ -88,6 +95,7 @@ Interactive dashboards provide insights into:
 ### Deployment
 
 * Vercel
+* GitHub
 
 ---
 
