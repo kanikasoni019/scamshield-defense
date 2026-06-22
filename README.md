@@ -4,6 +4,10 @@ ScamShield is a modern AI-powered cybersecurity platform focused on detecting ph
 
 The platform is designed to provide users with a simple and accessible way to analyze suspicious content before interacting with it.
 
+## Demo Video
+
+https://youtu.be/3v3FWScCv_Y
+
 ## Live Demo
 
 https://scamshield-defense.vercel.app/
