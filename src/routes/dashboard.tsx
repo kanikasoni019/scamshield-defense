@@ -58,7 +58,7 @@ const SAMPLES = [
 
 // ── Real Gemini AI Analysis ──────────────────────────────────────────────────
 async function analyzeWithGemini(input: string): Promise<AnalysisResult> {
-  const apiKey =  "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";
+  const apiKey =  "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";
   const prompt = `You are ScamShield, an expert AI scam detection system for India. Analyze the following message or URL for scam/phishing indicators.
 
 Message to analyze:
