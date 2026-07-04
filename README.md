@@ -1,9 +1,9 @@
 # ScamShield
 
-ScamShield is a modern AI-powered cybersecurity platform focused on detecting phishing attempts, scam messages, malicious links, and fraudulent communication in real time.
+ScamShield AI is an AI-powered cybersecurity platform that helps users detect phishing attempts, scam messages, malicious URLs, and fraudulent communication in real time.
+The project combines AI-based analysis with an intuitive interface to provide users with a clear risk assessment and an explanation of why a message or link may be unsafe.
 
-The platform is designed to provide users with a simple and accessible way to analyze suspicious content before interacting with it.
-
+It was built as a functional prototype to demonstrate how AI can improve digital scam awareness and online safety.
 ## Demo Video
 
 https://youtu.be/3v3FWScCv_Y
@@ -20,31 +20,30 @@ https://scamshield-defense.vercel.app/
 
 Analyze:
 
-* SMS messages
-* Emails
-* WhatsApp messages
-* URLs and links
+Analyze suspicious:
 
-The system classifies content as:
+SMS messages
+Emails
+WhatsApp messages
+URLs & Links
 
-* Safe
-* Suspicious
-* Scam
+Each analysis provides:
 
-along with a risk score and detailed explanation.
+Safe / Suspicious / Scam classification
+Risk Score
+AI-generated explanation
 
 ---
 
 ### Explainable Threat Analysis
 
-ScamShield identifies and explains:
+Instead of only giving a prediction, ScamShield explains why content appears risky by identifying indicators such as:
 
-* urgency-based manipulation
-* phishing indicators
-* suspicious domains
-* fake reward tactics
-* social engineering patterns
-
+Phishing patterns
+Suspicious links
+Urgency-based language
+Social engineering tactics
+Reward and lottery scams
 ---
 
 ### Blockchain Verification Layer
@@ -114,8 +113,10 @@ Interactive dashboards provide insights into:
 
 ## Future Scope
 
-* QR scam scanner
-* OCR-based screenshot analysis
-* Voice scam detection
-* Browser extension support
-* Real-time threat intelligence integration
+QR code scam detection
+Screenshot (OCR) analysis
+Voice call scam detection
+Browser extension
+Mobile application
+Improved community reputation system
+Enhanced real-time threat intelligence
