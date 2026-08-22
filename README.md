@@ -1,9 +1,11 @@
 # ScamShield
 
-ScamShield AI is an AI-powered cybersecurity platform that helps users detect phishing attempts, scam messages, malicious URLs, and fraudulent communication in real time.
-The project combines AI-based analysis with an intuitive interface to provide users with a clear risk assessment and an explanation of why a message or link may be unsafe.
+ScamShield AI is an AI-powered cybersecurity platform designed to help users identify phishing attempts, scam messages, malicious URLs, and fraudulent communication before they become a security or financial risk.
 
-It was built as a functional prototype to demonstrate how AI can improve digital scam awareness and online safety.
+The platform combines AI-based risk analysis with an intuitive user interface to evaluate suspicious content and provide a clear risk assessment along with understandable reasons behind the warning. This helps users make safer decisions instead of relying solely on their ability to recognize increasingly sophisticated scams.
+
+ScamShield AI was built as a functional prototype demonstrating how AI can act as an early-warning layer for digital fraud and social-engineering attacks, with a focus on improving scam awareness, risk detection, and online safety.
+
 ## Demo Video
 
 https://youtu.be/3v3FWScCv_Y
